@@ -40,7 +40,11 @@ export class RoomsComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.currentUser = this.authService.getCurrentUser();
+    // Suscribirse al usuario actual para mantenerlo actualizado
+    this.authService.currentUser$.subscribe(user => {
+      this.currentUser = user;
+    });
+    
     this.loadRooms();
   }
 
@@ -48,29 +52,46 @@ export class RoomsComponent implements OnInit {
     this.loading = true;
     this.error = '';
 
+    console.log('🏠 Cargando salas...');
+    console.log('🔐 Usuario autenticado:', this.authService.isAuthenticated());
+    console.log('🌐 API URL:', this.chatService.getApiUrl());
+
     // Cargar salas públicas
     this.chatService.getPublicRooms().subscribe({
       next: (rooms) => {
+        console.log('✅ Salas públicas cargadas:', rooms.length);
+        console.log('🔍 Datos de salas:', rooms);
+        rooms.forEach((room, index) => {
+          console.log(`🏠 Sala ${index + 1}: ID=${room.id}, Nombre="${room.name}"`);
+        });
         this.publicRooms = rooms;
       },
       error: (error) => {
-        console.error('Error cargando salas públicas:', error);
-        this.error = 'Error al cargar salas públicas';
+        console.error('❌ Error cargando salas públicas:', error);
+        console.error('❌ Status:', error.status);
+        console.error('❌ Message:', error.message);
+        console.error('❌ Error detail:', error.error);
+        this.error = `Error al cargar salas públicas: ${error.status} - ${error.message}`;
       }
     });
 
-    // Cargar salas del usuario
-    this.chatService.getUserRooms().subscribe({
-      next: (rooms) => {
-        this.userRooms = rooms;
-        this.loading = false;
-      },
-      error: (error) => {
-        console.error('Error cargando salas del usuario:', error);
-        this.error = 'Error al cargar tus salas';
-        this.loading = false;
-      }
-    });
+    // Cargar salas del usuario si está autenticado
+    if (this.authService.isAuthenticated()) {
+      this.chatService.getUserRooms().subscribe({
+        next: (rooms) => {
+          console.log('✅ Salas del usuario cargadas:', rooms.length);
+          this.userRooms = rooms;
+          this.loading = false;
+        },
+        error: (error) => {
+          console.error('❌ Error cargando salas del usuario:', error);
+          this.error = 'Error al cargar tus salas';
+          this.loading = false;
+        }
+      });
+    } else {
+      this.loading = false;
+    }
   }
 
   joinRoom(roomId: number): void {
@@ -91,6 +112,9 @@ export class RoomsComponent implements OnInit {
   }
 
   enterRoom(roomId: number): void {
+    console.log('🚪 Navegando a sala con ID:', roomId);
+    console.log('🔍 Tipo de roomId:', typeof roomId);
+    console.log('🔍 Es número válido:', !isNaN(roomId) && roomId > 0);
     this.router.navigate(['/chat', roomId]);
   }
 

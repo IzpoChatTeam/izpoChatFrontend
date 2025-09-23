@@ -7,8 +7,9 @@ import { Subscription } from 'rxjs';
 import { ChatService } from '../../services/chat.service';
 import { AuthService } from '../../services/auth.service';
 import { WebSocketService } from '../../services/websocket.service';
+import { FileUploadService } from '../../services/file-upload.service';
 import { Room } from '../../interfaces/room.interface';
-import { Message, WebSocketMessage } from '../../interfaces/message.interface';
+import { Message, WebSocketMessage, MessageCreate } from '../../interfaces/message.interface';
 import { User } from '../../interfaces/user.interface';
 
 @Component({
@@ -32,12 +33,19 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   connected = false;
   connectionStatus = false; // Añadido para el template
   
+  // File upload properties
+  uploadProgress = 0;
+  selectedFile: File | null = null;
+  
   typingUsers: Set<string> = new Set();
   typingTimeout: any;
   
   private subscriptions: Subscription[] = [];
   private roomId: number = 0;
   private shouldScrollToBottom = true;
+  isWebSocketConnected = false; // Público para el template
+  private httpPollingInterval: any;
+  private lastMessageId = 0;
 
   constructor(
     private route: ActivatedRoute,
@@ -45,6 +53,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     private chatService: ChatService,
     private authService: AuthService,
     private webSocketService: WebSocketService,
+    private fileUploadService: FileUploadService,
     private fb: FormBuilder
   ) {
     this.messageForm = this.fb.group({
@@ -57,7 +66,8 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     
     // Obtener roomId de la ruta
     this.route.params.subscribe(params => {
-      this.roomId = +params['roomId'];
+      this.roomId = +params['id'];  // Cambiar 'roomId' por 'id'
+      console.log('🏠 Room ID obtenido de la ruta:', this.roomId);
       this.loadRoom();
     });
 
@@ -112,6 +122,9 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     // Desconectar WebSocket
     this.webSocketService.disconnect();
     
+    // Limpiar HTTP polling
+    this.stopHttpPolling();
+    
     // Limpiar timeout de typing
     if (this.typingTimeout) {
       clearTimeout(this.typingTimeout);
@@ -122,17 +135,32 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.loading = true;
     this.error = '';
 
+    console.log('🔍 Cargando sala con ID:', this.roomId);
+    console.log('🔍 Tipo de roomId:', typeof this.roomId);
+    console.log('🔍 Es número válido:', !isNaN(this.roomId) && this.roomId > 0);
+
+    // Validar que el roomId sea un número válido
+    if (isNaN(this.roomId) || this.roomId <= 0) {
+      console.error('❌ Room ID inválido:', this.roomId);
+      this.error = 'ID de sala inválido';
+      this.loading = false;
+      return;
+    }
+
     // Cargar información de la sala
     this.chatService.getRoom(this.roomId).subscribe({
       next: (room) => {
+        console.log('✅ Sala cargada exitosamente:', room);
         this.room = room;
         this.loadMessages();
         this.connectWebSocket();
         this.loadOnlineUsers();
       },
       error: (error) => {
-        console.error('Error cargando sala:', error);
-        this.error = error.error?.detail || 'Error al cargar la sala';
+        console.error('❌ Error cargando sala:', error);
+        console.error('❌ Status:', error.status);
+        console.error('❌ Error detail:', error.error);
+        this.error = error.error?.detail || `Error al cargar la sala (${error.status})`;
         this.loading = false;
       }
     });
@@ -154,12 +182,27 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   connectWebSocket(): void {
+    console.log('🔌 Iniciando conexión WebSocket para sala:', this.roomId);
+    
     this.webSocketService.connect(this.roomId).then(() => {
-      console.log('Conectado al WebSocket de la sala');
+      console.log('✅ Conectado exitosamente al WebSocket de la sala');
       this.webSocketService.startHeartbeat();
+      this.error = ''; // Limpiar cualquier error previo
+      this.isWebSocketConnected = true;
     }).catch(error => {
-      console.error('Error conectando WebSocket:', error);
-      this.error = 'Error de conexión en tiempo real';
+      console.error('❌ Error conectando WebSocket:', error);
+      console.warn('🔄 WebSocket no disponible, usando polling HTTP como fallback');
+      
+      // Intentar diagnosticar el problema
+      console.log('🔍 Diagnóstico WebSocket:');
+      console.log('- Room ID:', this.roomId);
+      console.log('- Usuario autenticado:', this.authService.isAuthenticated());
+      console.log('- Token disponible:', !!this.authService.getToken());
+      console.log('- Posible causa: Firewall de Google Cloud bloqueando WebSockets');
+      
+      this.error = 'Conexión en tiempo real no disponible. Los mensajes se actualizarán cada 5 segundos.';
+      this.isWebSocketConnected = false;
+      this.startHttpPolling();
     });
   }
 
@@ -179,14 +222,34 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       const messageContent = this.messageForm.get('message')?.value.trim();
       
       if (messageContent) {
-        // Enviar via WebSocket para tiempo real
-        this.webSocketService.sendMessage(messageContent);
+        if (this.isWebSocketConnected && this.webSocketService.isConnected()) {
+          // Enviar via WebSocket para tiempo real
+          console.log('📤 Enviando mensaje via WebSocket');
+          this.webSocketService.sendMessage(messageContent);
+        } else {
+          // Fallback: Enviar via HTTP
+          console.log('📤 Enviando mensaje via HTTP (fallback)');
+          this.chatService.sendMessage(this.roomId, messageContent).subscribe({
+            next: (message) => {
+              console.log('✅ Mensaje enviado via HTTP:', message);
+              // Agregar mensaje a la lista inmediatamente
+              this.messages.push(message);
+              this.shouldScrollToBottom = true;
+            },
+            error: (error) => {
+              console.error('❌ Error enviando mensaje via HTTP:', error);
+              this.error = 'Error enviando mensaje';
+            }
+          });
+        }
         
         // Limpiar formulario
         this.messageForm.reset();
         
-        // Detener indicador de escritura
-        this.stopTyping();
+        // Detener indicador de escritura (solo si WebSocket está conectado)
+        if (this.isWebSocketConnected) {
+          this.stopTyping();
+        }
       }
     }
   }
@@ -351,5 +414,157 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       event.preventDefault();
       this.sendMessage();
     }
+  }
+
+  private startHttpPolling(): void {
+    console.log('🔄 Iniciando HTTP polling como fallback del WebSocket');
+    
+    // Limpiar interval anterior si existe
+    if (this.httpPollingInterval) {
+      clearInterval(this.httpPollingInterval);
+    }
+    
+    // Polling cada 5 segundos para obtener nuevos mensajes
+    this.httpPollingInterval = setInterval(() => {
+      this.loadMessages();
+    }, 5000);
+  }
+
+  private stopHttpPolling(): void {
+    if (this.httpPollingInterval) {
+      clearInterval(this.httpPollingInterval);
+      this.httpPollingInterval = null;
+    }
+  }
+
+  // File upload methods
+  onFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      this.selectedFile = input.files[0];
+      this.uploadFile();
+    }
+  }
+
+  private uploadFile(): void {
+    if (!this.selectedFile || !this.roomId) {
+      return;
+    }
+
+    // Validación de tamaño (10MB max)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (this.selectedFile.size > maxSize) {
+      alert('El archivo es demasiado grande. Máximo 10MB.');
+      return;
+    }
+
+    // Reset progress
+    this.uploadProgress = 0;
+
+    // Upload the file
+    this.fileUploadService.uploadFile(this.selectedFile)
+      .subscribe({
+        next: (event) => {
+          this.uploadProgress = event.progress;
+          
+          if (event.file) {
+            console.log('📁 Archivo subido exitosamente:', event.file);
+            
+            // Send file message through WebSocket or HTTP
+            const fileMessage = {
+              content: event.file.original_filename,
+              file_url: event.file.public_url,
+              file_type: event.file.content_type,
+              file_size: event.file.file_size
+            };
+
+            this.sendFileMessage(fileMessage);
+            
+            // Reset
+            this.selectedFile = null;
+            this.uploadProgress = 0;
+          }
+        },
+        error: (error) => {
+          console.error('❌ Error subiendo archivo:', error);
+          alert('Error al subir el archivo. Inténtalo de nuevo.');
+          this.uploadProgress = 0;
+          this.selectedFile = null;
+        }
+      });
+  }
+
+  private sendFileMessage(fileData: any): void {
+    if (!this.currentUser || !this.room) return;
+
+    // Para WebSocket, enviamos el objeto completo
+    const fileMessage: WebSocketMessage = {
+      type: 'message',
+      content: `📁 ${fileData.content}`,
+      room_id: this.room.id,
+      file: {
+        id: 0, // Será asignado por el backend
+        original_filename: fileData.content,
+        stored_filename: fileData.content,
+        file_size: fileData.file_size,
+        content_type: fileData.file_type,
+        public_url: fileData.file_url,
+        uploader_id: this.currentUser.id,
+        uploaded_at: new Date().toISOString(),
+        uploader: this.currentUser
+      }
+    };
+
+    if (this.isWebSocketConnected) {
+      this.webSocketService.sendMessage(JSON.stringify(fileMessage));
+    } else {
+      // Send via HTTP - solo enviamos el mensaje con referencia al archivo
+      const messageData: MessageCreate = {
+        content: `📁 ${fileData.content}`,
+        file_id: undefined // El backend asociará el archivo por el contenido o URL
+      };
+
+      this.chatService.sendMessage(this.room.id, messageData).subscribe({
+        next: () => {
+          console.log('📁 Mensaje de archivo enviado por HTTP');
+          this.loadMessages(); // Reload to show the new message
+        },
+        error: (error) => {
+          console.error('❌ Error enviando mensaje de archivo:', error);
+        }
+      });
+    }
+  }
+
+  // Utility methods for file display
+  getFileIcon(fileType: string): string {
+    if (fileType.startsWith('image/')) return '🖼️';
+    if (fileType.startsWith('video/')) return '🎥';
+    if (fileType.startsWith('audio/')) return '🎵';
+    if (fileType.includes('pdf')) return '📄';
+    if (fileType.includes('word') || fileType.includes('doc')) return '📝';
+    if (fileType.includes('zip') || fileType.includes('rar')) return '📦';
+    return '📁';
+  }
+
+  formatFileSize(bytes: number): string {
+    return this.fileUploadService.formatFileSize(bytes);
+  }
+
+  downloadFile(fileId: number, fileName: string): void {
+    this.fileUploadService.downloadFile(fileId, fileName).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      },
+      error: (error) => {
+        console.error('❌ Error descargando archivo:', error);
+        alert('Error al descargar el archivo.');
+      }
+    });
   }
 }

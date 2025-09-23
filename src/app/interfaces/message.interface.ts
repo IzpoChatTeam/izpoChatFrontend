@@ -27,7 +27,7 @@ export interface Message {
 
 export interface MessageCreate {
   content: string;
-  room_id: number;
+  room_id?: number;
   file_id?: number;
 }
 

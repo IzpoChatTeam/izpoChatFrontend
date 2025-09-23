@@ -77,15 +77,11 @@ export class AuthService {
   }
 
   getCurrentUserInfo(): Observable<User> {
-    return this.http.get<User>(`${this.apiUrl}/users/me`, {
-      headers: this.getAuthHeaders()
-    });
+    return this.http.get<User>(`${this.apiUrl}/users/me`);
   }
 
   updateCurrentUser(userData: Partial<User>): Observable<User> {
-    return this.http.put<User>(`${this.apiUrl}/users/me`, userData, {
-      headers: this.getAuthHeaders()
-    }).pipe(
+    return this.http.put<User>(`${this.apiUrl}/users/me`, userData).pipe(
       tap(updatedUser => {
         this.setUser(updatedUser);
       })
@@ -107,8 +103,33 @@ export class AuthService {
   }
 
   getToken(): string | null {
-    return this.tokenSubject.value || 
+    const token = this.tokenSubject.value || 
            (isPlatformBrowser(this.platformId) ? localStorage.getItem('token') : null);
+    console.log('🔐 AuthService.getToken() - Token disponible:', !!token);
+    if (token) {
+      console.log('🔐 Token (primeros 20 chars):', token.substring(0, 20) + '...');
+      
+      // Verificar si el token ha expirado
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const now = Math.floor(Date.now() / 1000);
+        const isExpired = payload.exp < now;
+        
+        console.log('🔐 Token expira en:', new Date(payload.exp * 1000));
+        console.log('🔐 Token expirado:', isExpired);
+        
+        if (isExpired) {
+          console.warn('⚠️ Token expirado, redirigiendo al login...');
+          this.logout();
+          return null;
+        }
+      } catch (error) {
+        console.error('❌ Error verificando token:', error);
+        this.logout();
+        return null;
+      }
+    }
+    return token;
   }
 
   getCurrentUser(): User | null {

@@ -36,7 +36,11 @@ export class WebSocketService {
     return new Promise((resolve, reject) => {
       const token = this.authService.getToken();
       
+      console.log('🔌 Intentando conectar WebSocket a sala:', roomId);
+      console.log('🔐 Token disponible:', !!token);
+      
       if (!token) {
+        console.error('❌ No hay token de autenticación');
         reject(new Error('No authentication token available'));
         return;
       }
@@ -46,12 +50,14 @@ export class WebSocketService {
 
       this.currentRoomId = roomId;
       const wsUrl = `${this.wsUrl}/${roomId}?token=${token}`;
+      console.log('🌐 URL WebSocket:', wsUrl);
 
       try {
+        console.log('⚡ Creando nueva conexión WebSocket...');
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = (event) => {
-          console.log('WebSocket conectado a sala:', roomId);
+          console.log('✅ WebSocket conectado exitosamente a sala:', roomId);
           this.connectionStatusSubject.next(true);
           this.reconnectAttempts = 0;
           resolve();
@@ -60,14 +66,20 @@ export class WebSocketService {
         this.ws.onmessage = (event) => {
           try {
             const data: WebSocketMessage = JSON.parse(event.data);
+            console.log('📨 Mensaje WebSocket recibido:', data);
             this.handleMessage(data);
           } catch (error) {
-            console.error('Error parsing WebSocket message:', error);
+            console.error('❌ Error parsing WebSocket message:', error);
           }
         };
 
         this.ws.onclose = (event) => {
-          console.log('WebSocket cerrado:', event.code, event.reason);
+          console.log('🔌 WebSocket cerrado:', event.code, event.reason);
+          console.log('🔍 Detalles del cierre:', {
+            code: event.code,
+            reason: event.reason,
+            wasClean: event.wasClean
+          });
           this.connectionStatusSubject.next(false);
           
           // Intentar reconectar si no fue un cierre intencional
@@ -77,12 +89,15 @@ export class WebSocketService {
         };
 
         this.ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
+          console.error('❌ WebSocket error:', error);
+          console.log('🔍 Estado de la conexión:', this.ws?.readyState);
+          console.log('🔍 URL que falló:', wsUrl);
           this.connectionStatusSubject.next(false);
           reject(error);
         };
 
       } catch (error) {
+        console.error('❌ Error creando WebSocket:', error);
         reject(error);
       }
     });

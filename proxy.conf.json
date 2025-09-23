@@ -1,6 +1,6 @@
 {
   "/api/*": {
-    "target": "http://34.72.14.164:8000",
+    "target": "http://34.72.14.164",
     "secure": false,
     "changeOrigin": true,
     "logLevel": "debug",
@@ -10,7 +10,7 @@
     }
   },
   "/ws/*": {
-    "target": "ws://34.72.14.164:8000",
+    "target": "http://34.72.14.164",
     "secure": false,
     "changeOrigin": true,
     "ws": true,
