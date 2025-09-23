@@ -64,7 +64,8 @@
               "buildTarget": "izpochat-web:build:production"
             },
             "development": {
-              "buildTarget": "izpochat-web:build:development"
+              "buildTarget": "izpochat-web:build:development",
+              "proxyConfig": "proxy.conf.json"
             }
           },
           "defaultConfiguration": "development"

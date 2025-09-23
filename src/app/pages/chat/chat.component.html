@@ -1,0 +1,144 @@
+<div class="chat-container" *ngIf="room">
+  <!-- Header -->
+  <div class="chat-header">
+    <div class="header-left">
+      <button (click)="goBack()" class="back-btn">
+        ← Volver
+      </button>
+      <div class="room-info">
+        <h2>{{ room.name }}</h2>
+        <div class="room-details">
+          <span class="room-type" [class.private]="room.is_private">
+            {{ room.is_private ? '🔒 Privada' : '🌐 Pública' }}
+          </span>
+          <span class="member-count">👥 {{ room.members.length }} miembros</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="header-right">
+      <div class="connection-status" [class.connected]="connectionStatus" [class.disconnected]="!connectionStatus">
+        {{ connectionStatus ? '🟢 Conectado' : '🔴 Desconectado' }}
+      </div>
+      <div class="online-users">
+        <span class="online-count">{{ onlineUsers.length }} en línea</span>
+      </div>
+      <button (click)="leaveRoom()" class="leave-btn" *ngIf="!isUserOwner(room)">
+        Salir de la sala
+      </button>
+    </div>
+  </div>
+
+  <!-- Error Message -->
+  <div class="error-banner" *ngIf="error">
+    {{ error }}
+    <button (click)="error = ''" class="close-error">×</button>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-container" *ngIf="loading">
+    <div class="loading-spinner"></div>
+    <p>Cargando chat...</p>
+  </div>
+
+  <!-- Chat Content -->
+  <div class="chat-content" *ngIf="!loading">
+    
+    <!-- Messages Container -->
+    <div class="messages-container" #messagesContainer>
+      <div class="messages-list">
+        
+        <!-- Date Separator -->
+        <div class="date-separator" *ngFor="let message of messages; let i = index">
+          <div class="date-divider" *ngIf="isNewDay(i)">
+            {{ formatMessageDate(message.created_at) }}
+          </div>
+          
+          <!-- Message -->
+          <div class="message" [class.own-message]="isOwnMessage(message)" [class.other-message]="!isOwnMessage(message)">
+            <div class="message-bubble">
+              <div class="message-header" *ngIf="!isOwnMessage(message)">
+                <span class="sender-name">{{ message.sender.username }}</span>
+                <span class="message-time">{{ formatMessageTime(message.created_at) }}</span>
+              </div>
+              
+              <div class="message-content">
+                {{ message.content }}
+              </div>
+              
+              <div class="message-file" *ngIf="message.file">
+                <a [href]="message.file.public_url" target="_blank" class="file-link">
+                  📎 {{ message.file.original_filename }}
+                </a>
+              </div>
+              
+              <div class="message-time-own" *ngIf="isOwnMessage(message)">
+                {{ formatMessageTime(message.created_at) }}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Empty State -->
+        <div class="empty-messages" *ngIf="messages.length === 0">
+          <p>No hay mensajes aún</p>
+          <p>¡Sé el primero en escribir algo!</p>
+        </div>
+      </div>
+      
+      <!-- Typing Indicator -->
+      <div class="typing-indicator" *ngIf="getTypingText()">
+        <div class="typing-bubble">
+          <span class="typing-text">{{ getTypingText() }}</span>
+          <div class="typing-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Message Input -->
+    <div class="message-input-container">
+      <form [formGroup]="messageForm" (ngSubmit)="sendMessage()" class="message-form">
+        <div class="input-group">
+          <input
+            type="text"
+            formControlName="message"
+            placeholder="Escribe tu mensaje..."
+            class="message-input"
+            #messageInput
+            (input)="onTyping()"
+            [disabled]="!connectionStatus"
+          />
+          <button
+            type="submit"
+            [disabled]="messageForm.invalid || !connectionStatus"
+            class="send-btn"
+          >
+            📤
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Online Users Sidebar (optional, can be toggled) -->
+  <div class="online-users-sidebar" *ngIf="false">
+    <h3>Usuarios en línea</h3>
+    <div class="users-list">
+      <div class="user-item" *ngFor="let user of onlineUsers">
+        <span class="user-status">🟢</span>
+        <span class="user-name">{{ user.username }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- No Room Found -->
+<div class="no-room" *ngIf="!room && !loading">
+  <h2>Sala no encontrada</h2>
+  <p>La sala que buscas no existe o no tienes acceso a ella.</p>
+  <button (click)="goBack()" class="back-btn">Volver a salas</button>
+</div>

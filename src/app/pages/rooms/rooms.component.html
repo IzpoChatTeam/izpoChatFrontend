@@ -1,0 +1,165 @@
+<div class="rooms-container">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-content">
+      <h1>IzpoChat</h1>
+      <div class="user-info" *ngIf="currentUser">
+        <span>¡Hola, {{ currentUser.username }}!</span>
+        <button (click)="logout()" class="logout-btn">Salir</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <div class="content-wrapper">
+      
+      <!-- Actions Bar -->
+      <div class="actions-bar">
+        <button (click)="toggleCreateForm()" class="create-room-btn">
+          {{ showCreateForm ? 'Cancelar' : '+ Crear Sala' }}
+        </button>
+        <button (click)="refreshRooms()" class="refresh-btn" [disabled]="loading">
+          🔄 Actualizar
+        </button>
+      </div>
+
+      <!-- Create Room Form -->
+      <div class="create-room-form" *ngIf="showCreateForm">
+        <h3>Crear Nueva Sala</h3>
+        <form [formGroup]="createRoomForm" (ngSubmit)="createRoom()">
+          <div class="form-group">
+            <label for="name">Nombre de la sala *</label>
+            <input
+              type="text"
+              id="name"
+              formControlName="name"
+              placeholder="Ej: Sala General"
+            />
+          </div>
+          
+          <div class="form-group">
+            <label for="description">Descripción</label>
+            <textarea
+              id="description"
+              formControlName="description"
+              placeholder="Descripción opcional de la sala"
+              rows="3"
+            ></textarea>
+          </div>
+          
+          <div class="form-group checkbox-group">
+            <label>
+              <input type="checkbox" formControlName="is_private" />
+              Sala privada (solo por invitación)
+            </label>
+          </div>
+          
+          <div class="form-actions">
+            <button type="submit" [disabled]="creatingRoom || createRoomForm.invalid" class="submit-btn">
+              {{ creatingRoom ? 'Creando...' : 'Crear Sala' }}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Error Message -->
+      <div class="error-message" *ngIf="error">
+        {{ error }}
+      </div>
+
+      <!-- Loading -->
+      <div class="loading" *ngIf="loading">
+        Cargando salas...
+      </div>
+
+      <!-- Room Lists -->
+      <div class="rooms-grid" *ngIf="!loading">
+        
+        <!-- User Rooms -->
+        <div class="room-section">
+          <h2>Mis Salas ({{ userRooms.length }})</h2>
+          <div class="rooms-list" *ngIf="userRooms.length > 0; else noUserRooms">
+            <div class="room-card user-room" *ngFor="let room of userRooms">
+              <div class="room-header">
+                <h3>{{ room.name }}</h3>
+                <span class="room-type" [class.private]="room.is_private">
+                  {{ room.is_private ? '🔒 Privada' : '🌐 Pública' }}
+                </span>
+              </div>
+              
+              <p class="room-description" *ngIf="room.description">
+                {{ room.description }}
+              </p>
+              
+              <div class="room-info">
+                <span class="member-count">👥 {{ room.members.length }} miembros</span>
+                <span class="owner-badge" *ngIf="isUserOwner(room)">👑 Propietario</span>
+              </div>
+              
+              <div class="room-actions">
+                <button (click)="enterRoom(room.id)" class="enter-btn">
+                  💬 Entrar al Chat
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <ng-template #noUserRooms>
+            <div class="empty-state">
+              <p>No perteneces a ninguna sala aún</p>
+              <p>¡Únete a una sala pública o crea una nueva!</p>
+            </div>
+          </ng-template>
+        </div>
+
+        <!-- Public Rooms -->
+        <div class="room-section">
+          <h2>Salas Públicas ({{ publicRooms.length }})</h2>
+          <div class="rooms-list" *ngIf="publicRooms.length > 0; else noPublicRooms">
+            <div class="room-card public-room" *ngFor="let room of publicRooms">
+              <div class="room-header">
+                <h3>{{ room.name }}</h3>
+                <span class="room-type">🌐 Pública</span>
+              </div>
+              
+              <p class="room-description" *ngIf="room.description">
+                {{ room.description }}
+              </p>
+              
+              <div class="room-info">
+                <span class="member-count">👥 {{ room.members.length }} miembros</span>
+                <span class="owner">👤 {{ room.owner.username }}</span>
+              </div>
+              
+              <div class="room-actions">
+                <button 
+                  *ngIf="!isUserInRoom(room)" 
+                  (click)="joinRoom(room.id)" 
+                  class="join-btn"
+                >
+                  ➕ Unirse
+                </button>
+                <button 
+                  *ngIf="isUserInRoom(room)" 
+                  (click)="enterRoom(room.id)" 
+                  class="enter-btn"
+                >
+                  💬 Entrar al Chat
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <ng-template #noPublicRooms>
+            <div class="empty-state">
+              <p>No hay salas públicas disponibles</p>
+              <p>¡Sé el primero en crear una!</p>
+            </div>
+          </ng-template>
+        </div>
+        
+      </div>
+    </div>
+  </div>
+</div>
