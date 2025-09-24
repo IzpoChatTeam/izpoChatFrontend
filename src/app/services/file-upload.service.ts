@@ -36,7 +36,7 @@ export class FileUploadService {
       formData.append('room_id', roomId);
     }
 
-    const req = new HttpRequest('POST', `${this.apiUrl}/upload`, formData, {
+    const req = new HttpRequest('POST', `${this.apiUrl}/api/upload`, formData, {
       reportProgress: true
     });
 
@@ -61,7 +61,7 @@ export class FileUploadService {
   }
 
   getFileUrl(fileId: number): string {
-    return `${this.apiUrl}/files/${fileId}`;
+    return `${this.apiUrl}/api/files/${fileId}`;
   }
 
   downloadFile(fileId: number, filename: string): Observable<Blob> {
@@ -71,11 +71,11 @@ export class FileUploadService {
   }
 
   getUploadedFiles(): Observable<FileUploadResponse[]> {
-    return this.http.get<FileUploadResponse[]>(`${this.apiUrl}/files`);
+    return this.http.get<FileUploadResponse[]>(`${this.apiUrl}/api/files`);
   }
 
   getRoomFiles(roomId: number): Observable<FileUploadResponse[]> {
-    return this.http.get<FileUploadResponse[]>(`${this.apiUrl}/rooms/${roomId}/files`);
+    return this.http.get<FileUploadResponse[]>(`${this.apiUrl}/api/rooms/${roomId}/files`);
   }
 
   isImageFile(contentType: string): boolean {

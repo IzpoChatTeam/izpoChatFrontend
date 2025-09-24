@@ -97,25 +97,23 @@ export class RegisterComponent {
           }
           
           // Manejo simplificado de errores para usuario final
-          if (error.status === 400) {
-            if (error.error?.detail && typeof error.error.detail === 'string') {
-              if (error.error.detail.includes('Email already registered')) {
-                this.error = 'El email ya está registrado';
-              } else if (error.error.detail.includes('Username already taken')) {
-                this.error = 'El nombre de usuario ya está en uso';
-              } else {
-                this.error = 'Error en los datos proporcionados';
-              }
-            } else {
-              this.error = 'Datos inválidos. Verifica la información';
-            }
-          } else if (error.status === 422) {
-            this.error = 'Error en la validación de datos. Verifica todos los campos';
-          } else if (error.status === 0) {
-            this.error = 'Problema de conexión. Intenta de nuevo en unos momentos';
+          if (error.status === 400 && error.error?.error) {
+          // Leemos el mensaje de la propiedad "error" que envía el backend
+          const errorMessage = error.error.error;
+
+          if (errorMessage.includes('Email ya está en uso')) {
+            this.error = 'Este correo electrónico ya está registrado.';
+          } else if (errorMessage.includes('Username ya está en uso')) {
+            this.error = 'Este nombre de usuario ya está en uso.';
           } else {
-            this.error = 'Error al registrar usuario. Intenta de nuevo';
+            this.error = 'Los datos proporcionados son inválidos.';
           }
+        } else if (error.status === 0) {
+            this.error = 'No se pudo conectar con el servidor. Intenta más tarde.';
+        } else {
+          // Para otros errores (500, etc.)
+          this.error = 'Ocurrió un error inesperado al intentar registrar.';
+        }
           this.loading = false;
         },
         complete: () => {

@@ -7,16 +7,16 @@
 
     <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="login-form">
       <div class="form-group">
-        <label for="username">Usuario</label>
+        <label for="email">Usuario</label>
         <input
           type="text"
-          id="username"
-          formControlName="username"
-          placeholder="Ingresa tu usuario"
-          [class.error]="isFieldInvalid('username')"
+          id="email"
+          formControlName="email"
+          placeholder="Ingresa tu correo electrónico"
+          [class.error]="isFieldInvalid('email')"
         />
-        <div class="error-message" *ngIf="isFieldInvalid('username')">
-          {{ getFieldError('username') }}
+        <div class="error-message" *ngIf="isFieldInvalid('email')">
+          {{ getFieldError('email') }}
         </div>
       </div>
 

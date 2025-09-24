@@ -221,34 +221,25 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       const messageContent = this.messageForm.get('message')?.value.trim();
       
       if (messageContent) {
-        if (this.isWebSocketConnected && this.socketIOService.isConnected()) {
-          // Enviar via WebSocket para tiempo real
-          console.log('📤 Enviando mensaje via WebSocket');
+        console.log('📤 Enviando mensaje:', messageContent);
+        console.log('🔗 WebSocket conectado:', this.socketIOService.isConnected());
+        console.log('🏠 Sala actual:', this.roomId);
+        
+        if (this.socketIOService.isConnected()) {
+          // Enviar via WebSocket
+          console.log('📤 Enviando mensaje via SocketIO');
           this.socketIOService.sendMessage(messageContent);
         } else {
-          // Fallback: Enviar via HTTP
-          console.log('📤 Enviando mensaje via HTTP (fallback)');
-          this.chatService.sendMessage(this.roomId, messageContent).subscribe({
-            next: (message) => {
-              console.log('✅ Mensaje enviado via HTTP:', message);
-              // Agregar mensaje a la lista inmediatamente
-              this.messages.push(message);
-              this.shouldScrollToBottom = true;
-            },
-            error: (error) => {
-              console.error('❌ Error enviando mensaje via HTTP:', error);
-              this.error = 'Error enviando mensaje';
-            }
-          });
+          console.warn('⚠️ WebSocket no conectado. Intentando reconectar...');
+          this.connectWebSocket();
+          this.error = 'Conexión perdida. Intentando reconectar...';
         }
         
         // Limpiar formulario
         this.messageForm.reset();
         
-        // Detener indicador de escritura (solo si WebSocket está conectado)
-        if (this.isWebSocketConnected) {
-          this.stopTyping();
-        }
+        // Detener indicador de escritura
+        this.stopTyping();
       }
     }
   }
@@ -280,6 +271,8 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   handleIncomingMessage(wsMessage: WebSocketMessage): void {
+    console.log('📨 Manejando mensaje WebSocket:', wsMessage);
+    
     if (wsMessage.type === 'message') {
       // Crear objeto Message desde WebSocketMessage
       const message: Message = {
@@ -293,9 +286,16 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         room: this.room!
       };
       
-      // Agregar mensaje a la lista
-      this.messages.push(message);
-      this.shouldScrollToBottom = true;
+      // Verificar que el mensaje no esté duplicado
+      const messageExists = this.messages.some(msg => msg.id === message.id);
+      if (!messageExists) {
+        console.log('➕ Agregando nuevo mensaje:', message);
+        // Agregar mensaje al final (más reciente)
+        this.messages.push(message);
+        this.shouldScrollToBottom = true;
+      } else {
+        console.log('⚠️ Mensaje duplicado ignorado:', message.id);
+      }
     }
   }
 

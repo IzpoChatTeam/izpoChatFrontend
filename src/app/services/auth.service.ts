@@ -45,14 +45,14 @@ export class AuthService {
   }
 
   register(userData: UserCreate): Observable<User> {
-    console.log('Register URL:', `${this.apiUrl}/users/register`);
+    console.log('Register URL:', `${this.apiUrl}/api/users/register`);
     console.log('Register data:', userData);
     
-    return this.http.post<User>(`${this.apiUrl}/users/register`, userData);
+    return this.http.post<User>(`${this.apiUrl}/api/users/register`, userData);
   }
 
   login(credentials: UserLogin): Observable<Token> {
-    return this.http.post<Token>(`${this.apiUrl}/users/login`, credentials)
+    return this.http.post<Token>(`${this.apiUrl}/api/users/login`, credentials)
       .pipe(
         tap(response => {
           // Guardar token
@@ -77,11 +77,11 @@ export class AuthService {
   }
 
   getCurrentUserInfo(): Observable<User> {
-    return this.http.get<User>(`${this.apiUrl}/users/me`);
+    return this.http.get<User>(`${this.apiUrl}/api/users/me`);
   }
 
   updateCurrentUser(userData: Partial<User>): Observable<User> {
-    return this.http.put<User>(`${this.apiUrl}/users/me`, userData).pipe(
+    return this.http.put<User>(`${this.apiUrl}/api/users/me`, userData).pipe(
       tap(updatedUser => {
         this.setUser(updatedUser);
       })
@@ -157,8 +157,8 @@ export class AuthService {
 
   // Método de prueba de conectividad
   testConnection(): Observable<any> {
-    console.log('Testing connection to:', `${this.apiUrl.replace('/api', '')}/health`);
-    return this.http.get(`${this.apiUrl.replace('/api', '')}/health`);
+    console.log('Testing connection to:', `${this.apiUrl}/health`);
+    return this.http.get(`${this.apiUrl}/health`);
   }
 
   // Método para obtener la URL de la API (para debugging)

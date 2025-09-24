@@ -9,7 +9,7 @@ import { environment } from '../../environments/environment';
 })
 export class WebSocketService {
   private ws: WebSocket | null = null;
-  private wsUrl = environment.wsUrl;
+  private wsUrl = environment.apiUrl;
   
   // Subjects para diferentes tipos de mensajes
   private messagesSubject = new Subject<WebSocketMessage>();

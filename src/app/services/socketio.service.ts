@@ -10,7 +10,7 @@ import { environment } from '../../environments/environment';
 })
 export class SocketIOService {
   private socket: Socket | null = null;
-  private wsUrl = environment.wsUrl;
+  private wsUrl = environment.wsUrl || environment.apiUrl;
   
   // Subjects para diferentes tipos de mensajes
   private messagesSubject = new Subject<any>();
@@ -95,7 +95,9 @@ export class SocketIOService {
 
       // Eventos de mensajes
       this.socket.on('new_message', (data) => {
-        console.log('📨 Nuevo mensaje recibido:', data);
+        console.log('📨 Nuevo mensaje recibido via SocketIO:', data);
+        console.log('📨 Tipo de datos:', typeof data);
+        console.log('📨 Estructura:', Object.keys(data));
         this.messagesSubject.next(data);
       });
 
@@ -139,13 +141,20 @@ export class SocketIOService {
 
   sendMessage(message: string): void {
     if (this.socket && this.currentRoomId) {
-      console.log('📤 Enviando mensaje:', message);
+      console.log('📤 Enviando mensaje SocketIO:');
+      console.log('  - Sala ID:', this.currentRoomId);
+      console.log('  - Contenido:', message);
+      console.log('  - Socket conectado:', this.socket.connected);
+      
       this.socket.emit('send_message', {
         room_id: this.currentRoomId,
         content: message
       });
     } else {
       console.error('❌ No hay conexión SocketIO o sala para enviar mensaje');
+      console.error('  - Socket disponible:', !!this.socket);
+      console.error('  - Socket conectado:', this.socket?.connected);
+      console.error('  - Sala actual:', this.currentRoomId);
     }
   }
 

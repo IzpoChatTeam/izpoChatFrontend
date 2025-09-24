@@ -1,17 +1,13 @@
 {
   "/api/*": {
-    "target": "http://34.72.14.164",
-    "secure": false,
+    "target": "https://izpochatbackend-1.onrender.com",
+    "secure": true,
     "changeOrigin": true,
-    "logLevel": "debug",
-    "headers": {
-      "Accept": "application/json",
-      "Content-Type": "application/json"
-    }
+    "logLevel": "debug"
   },
   "/socket.io/*": {
-    "target": "http://34.72.14.164",
-    "secure": false,
+    "target": "https://izpochatbackend-1.onrender.com",
+    "secure": true,
     "changeOrigin": true,
     "ws": true,
     "logLevel": "debug"
