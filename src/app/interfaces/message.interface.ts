@@ -3,26 +3,27 @@ import { Room } from './room.interface';
 
 export interface FileUpload {
   id: number;
+  filename: string;
   original_filename: string;
-  stored_filename: string;
   file_size: number;
   content_type: string;
-  public_url: string;
-  uploader_id: number;
-  uploaded_at: string;
-  uploader: User;
+  file_url: string;  // Flask usa file_url
+  user_id: number;
+  room_id?: number;
+  created_at: string;
 }
 
 export interface Message {
   id: number;
   content: string;
-  sender_id: number;
+  user_id: number;
   room_id: number;
-  file_id?: number;
+  file_url?: string;  // Flask usa file_url directamente
   created_at: string;
-  sender: User;
+  user: User;  // Flask usa 'user' en lugar de 'sender'
   room: Room;
-  file?: FileUpload;
+  sender?: User;  // Alias para user para compatibilidad (opcional)
+  file?: FileUpload;  // Para archivos adjuntos
 }
 
 export interface MessageCreate {

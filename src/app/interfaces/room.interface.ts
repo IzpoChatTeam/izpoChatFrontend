@@ -4,18 +4,18 @@ export interface Room {
   id: number;
   name: string;
   description?: string;
-  is_private: boolean;
-  owner_id: number;
+  created_by: number;  // Flask usa created_by
   created_at: string;
-  updated_at?: string;
-  owner: User;
-  members: User[];
+  creator: User;  // Flask usa creator en lugar de owner
+  is_private?: boolean;  // Opcional
+  members?: User[];      // Opcional
+  owner?: User;          // Alias para creator para compatibilidad (opcional)
+  owner_id?: number;     // Alias para created_by (opcional)
 }
 
 export interface RoomCreate {
   name: string;
   description?: string;
-  is_private: boolean;
 }
 
 export interface RoomUpdate {

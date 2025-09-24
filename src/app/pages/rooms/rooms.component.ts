@@ -148,7 +148,7 @@ export class RoomsComponent implements OnInit {
   }
 
   isUserInRoom(room: Room): boolean {
-    if (!this.currentUser) return false;
+    if (!this.currentUser || !room.members) return false;
     return room.members.some(member => member.id === this.currentUser!.id);
   }
 

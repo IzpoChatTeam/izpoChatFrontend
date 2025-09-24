@@ -9,7 +9,7 @@
       "Content-Type": "application/json"
     }
   },
-  "/ws/*": {
+  "/socket.io/*": {
     "target": "http://34.72.14.164",
     "secure": false,
     "changeOrigin": true,

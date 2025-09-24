@@ -6,7 +6,7 @@ import { Subscription } from 'rxjs';
 
 import { ChatService } from '../../services/chat.service';
 import { AuthService } from '../../services/auth.service';
-import { WebSocketService } from '../../services/websocket.service';
+import { SocketIOService } from '../../services/socketio.service';
 import { FileUploadService } from '../../services/file-upload.service';
 import { Room } from '../../interfaces/room.interface';
 import { Message, WebSocketMessage, MessageCreate } from '../../interfaces/message.interface';
@@ -52,7 +52,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     private router: Router,
     private chatService: ChatService,
     private authService: AuthService,
-    private webSocketService: WebSocketService,
+    private socketIOService: SocketIOService,
     private fileUploadService: FileUploadService,
     private fb: FormBuilder
   ) {
@@ -73,14 +73,14 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
     // Suscribirse a mensajes WebSocket
     this.subscriptions.push(
-      this.webSocketService.messages$.subscribe(message => {
+      this.socketIOService.messages$.subscribe(message => {
         this.handleIncomingMessage(message);
       })
     );
 
     // Suscribirse a estado de conexión
     this.subscriptions.push(
-      this.webSocketService.connectionStatus$.subscribe(connected => {
+      this.socketIOService.connectionStatus$.subscribe(connected => {
         this.connected = connected;
         this.connectionStatus = connected; // Sincronizar con la propiedad del template
       })
@@ -88,21 +88,21 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
     // Suscribirse a usuarios online
     this.subscriptions.push(
-      this.webSocketService.usersOnline$.subscribe(data => {
+      this.socketIOService.usersOnline$.subscribe(data => {
         this.handleUsersOnlineUpdate(data);
       })
     );
 
     // Suscribirse a indicadores de escritura
     this.subscriptions.push(
-      this.webSocketService.typing$.subscribe(data => {
+      this.socketIOService.typing$.subscribe(data => {
         this.handleTypingIndicator(data);
       })
     );
 
     // Suscribirse a errores
     this.subscriptions.push(
-      this.webSocketService.errors$.subscribe(error => {
+      this.socketIOService.errors$.subscribe(error => {
         console.error('WebSocket error:', error);
         this.error = error.message || 'Error de conexión';
       })
@@ -120,7 +120,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.subscriptions.forEach(sub => sub.unsubscribe());
     
     // Desconectar WebSocket
-    this.webSocketService.disconnect();
+    this.socketIOService.disconnect();
     
     // Limpiar HTTP polling
     this.stopHttpPolling();
@@ -184,9 +184,8 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   connectWebSocket(): void {
     console.log('🔌 Iniciando conexión WebSocket para sala:', this.roomId);
     
-    this.webSocketService.connect(this.roomId).then(() => {
-      console.log('✅ Conectado exitosamente al WebSocket de la sala');
-      this.webSocketService.startHeartbeat();
+    this.socketIOService.connect(this.roomId).then(() => {
+      console.log('✅ Conectado exitosamente al SocketIO de la sala');
       this.error = ''; // Limpiar cualquier error previo
       this.isWebSocketConnected = true;
     }).catch(error => {
@@ -222,10 +221,10 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       const messageContent = this.messageForm.get('message')?.value.trim();
       
       if (messageContent) {
-        if (this.isWebSocketConnected && this.webSocketService.isConnected()) {
+        if (this.isWebSocketConnected && this.socketIOService.isConnected()) {
           // Enviar via WebSocket para tiempo real
           console.log('📤 Enviando mensaje via WebSocket');
-          this.webSocketService.sendMessage(messageContent);
+          this.socketIOService.sendMessage(messageContent);
         } else {
           // Fallback: Enviar via HTTP
           console.log('📤 Enviando mensaje via HTTP (fallback)');
@@ -260,7 +259,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   onMessageInput(): void {
     // Iniciar indicador de escritura
-    this.webSocketService.sendTypingIndicator(true);
+    this.socketIOService.sendTypingIndicator(true);
     
     // Programar detener indicador después de 3 segundos
     if (this.typingTimeout) {
@@ -273,7 +272,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   stopTyping(): void {
-    this.webSocketService.sendTypingIndicator(false);
+    this.socketIOService.sendTypingIndicator(false);
     if (this.typingTimeout) {
       clearTimeout(this.typingTimeout);
       this.typingTimeout = null;
@@ -286,12 +285,12 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       const message: Message = {
         id: wsMessage.id!,
         content: wsMessage.content!,
-        sender_id: wsMessage.sender!.id,
+        user_id: wsMessage.sender!.id,
         room_id: wsMessage.room_id!,
         created_at: wsMessage.timestamp!,
-        sender: wsMessage.sender!,
-        room: this.room!,
-        file_id: wsMessage.file?.id
+        user: wsMessage.sender!,
+        sender: wsMessage.sender!,  // Agregar alias
+        room: this.room!
       };
       
       // Agregar mensaje a la lista
@@ -382,12 +381,12 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   isOwnMessage(message: Message): boolean {
-    return message.sender_id === this.currentUser?.id;
+    return message.user_id === this.currentUser?.id;
   }
 
   isUserOwner(room: Room): boolean {
     if (!this.currentUser) return false;
-    return room.owner_id === this.currentUser.id;
+    return room.created_by === this.currentUser.id;
   }
 
   leaveRoom(): void {
@@ -406,7 +405,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   isMyMessage(message: Message): boolean {
-    return this.currentUser?.id === message.sender_id;
+    return this.currentUser?.id === message.user_id;
   }
 
   onKeyPress(event: KeyboardEvent): void {
@@ -473,7 +472,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
             // Send file message through WebSocket or HTTP
             const fileMessage = {
               content: event.file.original_filename,
-              file_url: event.file.public_url,
+              file_url: event.file.file_url,
               file_type: event.file.content_type,
               file_size: event.file.file_size
             };
@@ -505,18 +504,17 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       file: {
         id: 0, // Será asignado por el backend
         original_filename: fileData.content,
-        stored_filename: fileData.content,
+        filename: fileData.content,
         file_size: fileData.file_size,
         content_type: fileData.file_type,
-        public_url: fileData.file_url,
-        uploader_id: this.currentUser.id,
-        uploaded_at: new Date().toISOString(),
-        uploader: this.currentUser
+        file_url: fileData.file_url,
+        user_id: this.currentUser.id,
+        created_at: new Date().toISOString()
       }
     };
 
     if (this.isWebSocketConnected) {
-      this.webSocketService.sendMessage(JSON.stringify(fileMessage));
+      this.socketIOService.sendMessage(JSON.stringify(fileMessage));
     } else {
       // Send via HTTP - solo enviamos el mensaje con referencia al archivo
       const messageData: MessageCreate = {

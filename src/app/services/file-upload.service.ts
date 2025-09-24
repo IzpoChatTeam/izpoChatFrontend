@@ -6,13 +6,14 @@ import { environment } from '../../environments/environment';
 
 export interface FileUploadResponse {
   id: number;
+  filename: string;
   original_filename: string;
-  stored_filename: string;
   file_size: number;
   content_type: string;
-  public_url: string;
-  uploader_id: number;
-  uploaded_at: string;
+  file_url: string;
+  user_id: number;
+  room_id?: number;
+  created_at: string;
 }
 
 export interface UploadProgress {
@@ -28,11 +29,14 @@ export class FileUploadService {
 
   constructor(private http: HttpClient) {}
 
-  uploadFile(file: File): Observable<UploadProgress> {
+  uploadFile(file: File, roomId?: string): Observable<UploadProgress> {
     const formData = new FormData();
     formData.append('file', file);
+    if (roomId) {
+      formData.append('room_id', roomId);
+    }
 
-    const req = new HttpRequest('POST', `${this.apiUrl}/uploads/`, formData, {
+    const req = new HttpRequest('POST', `${this.apiUrl}/upload`, formData, {
       reportProgress: true
     });
 
@@ -57,21 +61,21 @@ export class FileUploadService {
   }
 
   getFileUrl(fileId: number): string {
-    return `${this.apiUrl}/uploads/${fileId}`;
+    return `${this.apiUrl}/files/${fileId}`;
   }
 
   downloadFile(fileId: number, filename: string): Observable<Blob> {
-    return this.http.get(`${this.apiUrl}/uploads/${fileId}/download`, {
+    return this.http.get(`${this.apiUrl}/files/${fileId}`, {
       responseType: 'blob'
     });
   }
 
   getUploadedFiles(): Observable<FileUploadResponse[]> {
-    return this.http.get<FileUploadResponse[]>(`${this.apiUrl}/uploads/`);
+    return this.http.get<FileUploadResponse[]>(`${this.apiUrl}/files`);
   }
 
-  getAllowedFileTypes(): Observable<any> {
-    return this.http.get(`${this.apiUrl}/uploads/types/allowed`);
+  getRoomFiles(roomId: number): Observable<FileUploadResponse[]> {
+    return this.http.get<FileUploadResponse[]>(`${this.apiUrl}/rooms/${roomId}/files`);
   }
 
   isImageFile(contentType: string): boolean {

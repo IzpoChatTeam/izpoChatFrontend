@@ -11,7 +11,7 @@
           <span class="room-type" [class.private]="room.is_private">
             {{ room.is_private ? '🔒 Privada' : '🌐 Pública' }}
           </span>
-          <span class="member-count">👥 {{ room.members.length }} miembros</span>
+          <span class="member-count">👥 {{ room.members?.length || 0 }} miembros</span>
         </div>
       </div>
     </div>
@@ -59,7 +59,7 @@
           <div class="message" [class.own-message]="isOwnMessage(message)" [class.other-message]="!isOwnMessage(message)">
             <div class="message-bubble">
               <div class="message-header" *ngIf="!isOwnMessage(message)">
-                <span class="sender-name">{{ message.sender.username }}</span>
+                <span class="sender-name">{{ message.sender?.username || message.user.username }}</span>
                 <span class="message-time">{{ formatMessageTime(message.created_at) }}</span>
               </div>
               

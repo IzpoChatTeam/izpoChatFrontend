@@ -93,7 +93,7 @@
               </p>
               
               <div class="room-info">
-                <span class="member-count">👥 {{ room.members.length }} miembros</span>
+                <span class="member-count">👥 {{ room.members?.length || 0 }} miembros</span>
                 <span class="owner-badge" *ngIf="isUserOwner(room)">👑 Propietario</span>
               </div>
               
@@ -128,8 +128,8 @@
               </p>
               
               <div class="room-info">
-                <span class="member-count">👥 {{ room.members.length }} miembros</span>
-                <span class="owner">👤 {{ room.owner.username }}</span>
+                <span class="member-count">👥 {{ room.members?.length || 0 }} miembros</span>
+                <span class="owner">👤 {{ room.owner?.username || room.creator.username }}</span>
               </div>
               
               <div class="room-actions">

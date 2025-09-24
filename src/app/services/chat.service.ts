@@ -22,7 +22,7 @@ export class ChatService {
   // ==================== ROOMS ====================
 
   getPublicRooms(skip: number = 0, limit: number = 100): Observable<Room[]> {
-    return this.http.get<Room[]>(`${this.apiUrl}/rooms/?skip=${skip}&limit=${limit}`);
+    return this.http.get<Room[]>(`${this.apiUrl}/rooms`);
   }
 
   getRoom(roomId: number): Observable<Room> {
@@ -30,7 +30,7 @@ export class ChatService {
   }
 
   createRoom(roomData: RoomCreate): Observable<Room> {
-    return this.http.post<Room>(`${this.apiUrl}/rooms/`, roomData);
+    return this.http.post<Room>(`${this.apiUrl}/rooms`, roomData);
   }
 
   updateRoom(roomId: number, roomData: RoomUpdate): Observable<Room> {
@@ -52,7 +52,7 @@ export class ChatService {
   // ==================== MESSAGES ====================
 
   getRoomMessages(roomId: number, skip: number = 0, limit: number = 50): Observable<Message[]> {
-    return this.http.get<Message[]>(`${this.apiUrl}/rooms/${roomId}/messages?skip=${skip}&limit=${limit}`);
+    return this.http.get<Message[]>(`${this.apiUrl}/rooms/${roomId}/messages`);
   }
 
   sendMessage(roomId: number, messageData: MessageCreate): Observable<Message> {
@@ -76,7 +76,7 @@ export class ChatService {
   // ==================== USERS ====================
 
   getUsers(skip: number = 0, limit: number = 100): Observable<User[]> {
-    return this.http.get<User[]>(`${this.apiUrl}/users?skip=${skip}&limit=${limit}`);
+    return this.http.get<User[]>(`${this.apiUrl}/users`);
   }
 
   getUserById(userId: number): Observable<User> {
