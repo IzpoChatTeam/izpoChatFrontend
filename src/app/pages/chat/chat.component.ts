@@ -81,8 +81,13 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.error = '';
 
     this.chatService.getRoomById(this.roomId).subscribe({
-      next: response => {
-        this.room = response.data;
+      next: (response: any) => {
+        // Manejar respuesta flexible del backend
+        if (response && response.data) {
+          this.room = response.data;
+        } else {
+          this.room = response;
+        }
         this.loadMessages();
       },
       error: (err: any) => {
@@ -94,8 +99,19 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   private loadMessages(): void {
     this.chatService.getRoomMessages(this.roomId).subscribe({
-      next: (response) => {
-        this.messages = response.data.sort((a, b) => 
+      next: (response: any) => {
+        // Manejar respuesta flexible del backend
+        let messagesArray: Message[] = [];
+        if (Array.isArray(response)) {
+          messagesArray = response;
+        } else if (response && response.data && Array.isArray(response.data)) {
+          messagesArray = response.data;
+        } else {
+          console.warn('⚠️ Respuesta inesperada de mensajes:', response);
+          messagesArray = [];
+        }
+        
+        this.messages = messagesArray.sort((a: any, b: any) => 
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         );
         this.lastMessageCount = this.messages.length;
@@ -118,8 +134,18 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   private checkForNewMessages(): void {
     this.chatService.getRoomMessages(this.roomId).subscribe({
-      next: (response) => {
-        const newMessages = response.data.sort((a, b) => 
+      next: (response: any) => {
+        // Manejar respuesta flexible del backend
+        let messagesArray: Message[] = [];
+        if (Array.isArray(response)) {
+          messagesArray = response;
+        } else if (response && response.data && Array.isArray(response.data)) {
+          messagesArray = response.data;
+        } else {
+          messagesArray = [];
+        }
+        
+        const newMessages = messagesArray.sort((a: any, b: any) => 
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         );
         

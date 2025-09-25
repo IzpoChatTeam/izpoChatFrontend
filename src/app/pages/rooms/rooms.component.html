@@ -4,7 +4,7 @@
     <div class="header-content">
       <h1>IzpoChat</h1>
       <div class="user-info" *ngIf="currentUser">
-        <span>¡Hola, {{ currentUser.username }}!</span>
+        <span>¡Hola, {{ currentUser?.username || 'Usuario' }}!</span>
         <button (click)="logout()" class="logout-btn">Salir</button>
       </div>
     </div>
@@ -129,21 +129,14 @@
               
               <div class="room-info">
                 <span class="member-count">👥 {{ room.members?.length || 0 }} miembros</span>
-                <span class="owner">👤 {{ room.creator.username }}</span>
+                <span class="owner">👤 {{ room.creator?.username || 'Desconocido' }}</span>
               </div>
               
               <div class="room-actions">
+                <!-- Botón principal: siempre disponible para salas públicas -->
                 <button 
-                  *ngIf="!isUserInRoom(room)" 
-                  (click)="joinRoom(room.id)" 
-                  class="join-btn"
-                >
-                  ➕ Unirse
-                </button>
-                <button 
-                  *ngIf="isUserInRoom(room)" 
                   (click)="enterRoom(room.id)" 
-                  class="enter-btn"
+                  class="enter-btn primary"
                 >
                   💬 Entrar al Chat
                 </button>

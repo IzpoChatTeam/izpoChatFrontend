@@ -31,8 +31,8 @@ export class ChatService {
    * Obtiene todas las salas públicas.
    * GET /api/rooms
    */
-  getRooms(): Observable<ApiResponse<Room[]>> {
-    return this.http.get<ApiResponse<Room[]>>(`${this.apiUrl}/api/rooms`, {
+  getRooms(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/api/rooms`, {
       headers: this.getHeaders()
     });
   }
@@ -51,8 +51,8 @@ export class ChatService {
    * Obtiene una sala específica por ID.
    * GET /api/rooms/:id
    */
-  getRoomById(roomId: number): Observable<ApiResponse<Room>> {
-    return this.http.get<ApiResponse<Room>>(`${this.apiUrl}/api/rooms/${roomId}`, {
+  getRoomById(roomId: number): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/api/rooms/${roomId}`, {
       headers: this.getHeaders()
     });
   }
@@ -79,8 +79,8 @@ export class ChatService {
    * Obtiene todos los mensajes de una sala específica.
    * GET /api/rooms/:id/messages
    */
-  getRoomMessages(roomId: number): Observable<ApiResponse<Message[]>> {
-    return this.http.get<ApiResponse<Message[]>>(`${this.apiUrl}/api/rooms/${roomId}/messages`, {
+  getRoomMessages(roomId: number): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/api/rooms/${roomId}/messages`, {
       headers: this.getHeaders()
     });
   }

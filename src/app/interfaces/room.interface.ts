@@ -6,9 +6,9 @@ export interface Room {
   description?: string | null;
   is_private?: boolean;
   created_at: string;
-  creator: {
-    id: number;
-    username: string;
+  creator?: {
+    id?: number;
+    username?: string;
     full_name?: string;
   };
   members?: User[];  // Para conversaciones privadas

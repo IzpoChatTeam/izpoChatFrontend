@@ -58,17 +58,56 @@ export class RoomsComponent implements OnInit {
 
     // Cargar salas públicas
     this.chatService.getRooms().subscribe({
-      next: (response) => {
-        console.log('✅ Salas cargadas:', response.data.length);
-        console.log('🔍 Datos de salas:', response.data);
-        response.data.forEach((room, index) => {
-          console.log(`🏠 Sala ${index + 1}: ID=${room.id}, Nombre="${room.name}"`);
+      next: (response: any) => {
+        console.log('✅ Respuesta completa del backend:', response);
+        
+        // El backend podría devolver directamente un array o { data: array }
+        let roomsArray: Room[] = [];
+        if (Array.isArray(response)) {
+          // Backend devuelve directamente un array
+          roomsArray = response;
+          console.log('✅ Salas cargadas (array directo):', roomsArray.length);
+        } else if (response && response.data && Array.isArray(response.data)) {
+          // Backend devuelve { data: array }
+          roomsArray = response.data;
+          console.log('✅ Salas cargadas (objeto con data):', roomsArray.length);
+        } else {
+          // Respuesta inesperada
+          console.warn('⚠️ Respuesta inesperada del backend:', response);
+          roomsArray = [];
+        }
+        
+        console.log('🔍 Datos de salas:', roomsArray);
+        
+        // Procesar salas para asegurar integridad de datos
+        const processedRooms = roomsArray.map((room: any) => {
+          // Asegurar que el creador tenga la estructura correcta
+          if (!room.creator || typeof room.creator !== 'object') {
+            room.creator = { username: 'Desconocido' };
+          } else if (!room.creator.username) {
+            room.creator.username = 'Desconocido';
+          }
+          
+          // Asegurar que members sea un array
+          if (!Array.isArray(room.members)) {
+            room.members = [];
+          }
+          
+          return room;
         });
         
+        if (processedRooms.length === 0) {
+          console.log('📝 No hay salas disponibles');
+        } else {
+          processedRooms.forEach((room: Room, index: number) => {
+            console.log(`🏠 Sala ${index + 1}: ID=${room.id}, Nombre="${room.name}", Creador="${room.creator?.username}"`);
+          });
+        }
+        
         // Separar salas públicas y privadas
-        this.publicRooms = response.data.filter(room => !room.is_private);
-        this.userRooms = response.data.filter(room => 
-          room.is_private && room.members?.some(member => member.id === this.currentUser?.id)
+        this.publicRooms = processedRooms.filter((room: Room) => !room.is_private);
+        this.userRooms = processedRooms.filter((room: Room) => 
+          room.is_private && room.members?.some((member: any) => member.id === this.currentUser?.id)
         );
         this.loading = false;
       },
@@ -131,7 +170,7 @@ export class RoomsComponent implements OnInit {
   }
 
   isUserOwner(room: Room): boolean {
-    if (!this.currentUser) return false;
+    if (!this.currentUser || !room.creator) return false;
     return room.creator.id === this.currentUser.id;
   }
 
