@@ -1,179 +1,100 @@
-<div class="chat-container" *ngIf="room">
-  <!-- Header -->
+<div class="chat-container" *ngIf="room; else noRoomFound">
   <div class="chat-header">
     <div class="header-left">
-      <button (click)="goBack()" class="back-btn">
-        ← Volver
-      </button>
+      <button (click)="goBack()" class="back-btn">← Volver</button>
       <div class="room-info">
         <h2>{{ room.name }}</h2>
-        <div class="room-details">
-          <span class="room-type" [class.private]="room.is_private">
-            {{ room.is_private ? '🔒 Privada' : '🌐 Pública' }}
-          </span>
-          <span class="member-count">👥 {{ room.members?.length || 0 }} miembros</span>
-        </div>
+        <p class="room-description">{{ room.description }}</p>
       </div>
     </div>
-    
     <div class="header-right">
-      <div class="connection-status" [class.websocket]="isWebSocketConnected" [class.http-fallback]="!isWebSocketConnected">
-        <span *ngIf="isWebSocketConnected">🟢 Tiempo Real</span>
-        <span *ngIf="!isWebSocketConnected">🟡 HTTP Polling</span>
+      <div class="connection-status" [class.websocket]="connectionStatus">
+        <span *ngIf="connectionStatus">🟢 Conectado</span>
+        <span *ngIf="!connectionStatus">🔴 Desconectado</span>
       </div>
-      <div class="online-users">
-        <span class="online-count">{{ onlineUsers.length }} en línea</span>
-      </div>
-      <button (click)="leaveRoom()" class="leave-btn" *ngIf="!isUserOwner(room)">
-        Salir de la sala
-      </button>
     </div>
   </div>
 
-  <!-- Error Message -->
   <div class="error-banner" *ngIf="error">
     {{ error }}
     <button (click)="error = ''" class="close-error">×</button>
   </div>
 
-  <!-- Loading -->
   <div class="loading-container" *ngIf="loading">
     <div class="loading-spinner"></div>
-    <p>Cargando chat...</p>
+    <p>Cargando mensajes...</p>
   </div>
 
-  <!-- Chat Content -->
   <div class="chat-content" *ngIf="!loading">
-    
-    <!-- Messages Container -->
     <div class="messages-container" #messagesContainer>
       <div class="messages-list">
-        
-        <!-- Date Separator -->
-        <div class="date-separator" *ngFor="let message of messages; let i = index">
+        <div class="empty-messages" *ngIf="messages.length === 0">
+          <p>Aún no hay mensajes en esta sala.</p>
+          <p>¡Sé el primero en decir hola!</p>
+        </div>
+
+        <div *ngFor="let message of messages; let i = index">
           <div class="date-divider" *ngIf="isNewDay(i)">
-            {{ formatMessageDate(message.created_at) }}
+            <span>{{ formatMessageDate(message.created_at) }}</span>
           </div>
           
-          <!-- Message -->
-          <div class="message" [class.own-message]="isOwnMessage(message)" [class.other-message]="!isOwnMessage(message)">
+          <div class="message" [class.own-message]="isOwnMessage(message)">
             <div class="message-bubble">
               <div class="message-header" *ngIf="!isOwnMessage(message)">
-                <span class="sender-name">{{ message.sender?.username || message.user.username }}</span>
-                <span class="message-time">{{ formatMessageTime(message.created_at) }}</span>
+                <span class="sender-name">{{ message.sender?.username }}</span>
               </div>
               
               <div class="message-content">
-                <span *ngIf="!message.file">{{ message.content }}</span>
+                <a *ngIf="message.file_url" [href]="message.file_url" target="_blank" rel="noopener noreferrer" class="file-link">
+                  {{ message.content }}
+                </a>
+                <span *ngIf="!message.file_url">{{ message.content }}</span>
               </div>
-              
-              <div class="file-message" *ngIf="message.file" (click)="downloadFile(message.file.id, message.file.original_filename)">
-                <div class="file-icon">{{ getFileIcon(message.file.content_type) }}</div>
-                <div class="file-info">
-                  <div class="file-name">{{ message.file.original_filename }}</div>
-                  <div class="file-size">{{ formatFileSize(message.file.file_size) }}</div>
-                </div>
-                <button class="download-btn" (click)="$event.stopPropagation(); downloadFile(message.file.id, message.file.original_filename)">
-                  Descargar
-                </button>
-              </div>
-              
-              <div class="message-time-own" *ngIf="isOwnMessage(message)">
+
+              <div class="message-time">
                 {{ formatMessageTime(message.created_at) }}
               </div>
             </div>
           </div>
         </div>
-        
-        <!-- Empty State -->
-        <div class="empty-messages" *ngIf="messages.length === 0">
-          <p>No hay mensajes aún</p>
-          <p>¡Sé el primero en escribir algo!</p>
-        </div>
-      </div>
-      
-      <!-- Typing Indicator -->
-      <div class="typing-indicator" *ngIf="getTypingText()">
-        <div class="typing-bubble">
-          <span class="typing-text">{{ getTypingText() }}</span>
-          <div class="typing-dots">
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
-        </div>
       </div>
     </div>
 
-    <!-- Message Input -->
     <div class="message-input-container">
-      <!-- File Upload Progress -->
       <div class="upload-progress" *ngIf="uploadProgress > 0 && uploadProgress < 100">
         <div class="progress-bar">
           <div class="progress-fill" [style.width.%]="uploadProgress"></div>
         </div>
-        <span class="progress-text">Subiendo archivo... {{ uploadProgress }}%</span>
+        <span class="progress-text">Subiendo... {{ uploadProgress }}%</span>
       </div>
-
-      <!-- File Input (hidden) -->
-      <input 
-        type="file" 
-        #fileInput 
-        (change)="onFileSelected($event)"
-        accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar"
-        style="display: none"
-      >
 
       <form [formGroup]="messageForm" (ngSubmit)="sendMessage()" class="message-form">
         <div class="input-group">
-          <!-- File Upload Button -->
-          <button
-            type="button"
-            (click)="fileInput.click()"
-            class="file-btn"
-            [disabled]="uploadProgress > 0 && uploadProgress < 100"
-            title="Subir archivo"
-          >
-            📎
-          </button>
-
+          <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none" id="fileInput">
+          
+          <button type="button" (click)="fileInput.click()" class="file-btn" [disabled]="!connectionStatus || uploadProgress > 0" title="Adjuntar archivo">📎</button>
+          
           <input
             type="text"
-            formControlName="message"
-            placeholder="Escribe tu mensaje..."
-            class="message-input"
             #messageInput
-            (input)="onTyping()"
+            class="message-input"
+            placeholder="Escribe un mensaje..."
+            formControlName="content"  
             (keypress)="onKeyPress($event)"
-            [disabled]="!isWebSocketConnected && !connectionStatus"
+            [disabled]="!connectionStatus"
           />
-          <button
-            type="submit"
-            [disabled]="messageForm.invalid || (!isWebSocketConnected && !connectionStatus)"
-            class="send-btn"
-          >
-            📤
-          </button>
+          
+          <button type="submit" class="send-btn" [disabled]="messageForm.invalid || !connectionStatus">📤</button>
         </div>
       </form>
     </div>
   </div>
+</div>
 
-  <!-- Online Users Sidebar (optional, can be toggled) -->
-  <div class="online-users-sidebar" *ngIf="false">
-    <h3>Usuarios en línea</h3>
-    <div class="users-list">
-      <div class="user-item" *ngFor="let user of onlineUsers">
-        <span class="user-status">🟢</span>
-        <span class="user-name">{{ user.username }}</span>
-      </div>
-    </div>
+<ng-template #noRoomFound>
+  <div class="no-room" *ngIf="!loading">
+    <h2>Sala no encontrada</h2>
+    <p>La sala a la que intentas acceder no existe.</p>
+    <button (click)="goBack()" class="back-btn">← Volver a la lista de salas</button>
   </div>
-</div>
-
-<!-- No Room Found -->
-<div class="no-room" *ngIf="!room && !loading">
-  <h2>Sala no encontrada</h2>
-  <p>La sala que buscas no existe o no tienes acceso a ella.</p>
-  <button (click)="goBack()" class="back-btn">Volver a salas</button>
-</div>
+</ng-template>

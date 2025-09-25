@@ -1,11 +1,13 @@
+// src/app/services/auth.service.ts
 import { Injectable, Inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable, BehaviorSubject, tap } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+import { Observable, BehaviorSubject, tap, catchError, of } from 'rxjs';
 import { Router } from '@angular/router';
 
 import { User, UserCreate, UserLogin } from '../interfaces/user.interface';
-import { Token } from '../interfaces/api.interface';
+// CAMBIO: Se importan las nuevas interfaces de respuesta
+import { RegisterResponse, LoginResponse } from '../interfaces/api.interface';
 import { environment } from '../../environments/environment';
 
 @Injectable({
@@ -14,54 +16,37 @@ import { environment } from '../../environments/environment';
 export class AuthService {
   private apiUrl = environment.apiUrl;
   private currentUserSubject = new BehaviorSubject<User | null>(null);
-  private tokenSubject = new BehaviorSubject<string | null>(null);
-
   public currentUser$ = this.currentUserSubject.asObservable();
-  public token$ = this.tokenSubject.asObservable();
 
   constructor(
     private http: HttpClient,
     private router: Router,
     @Inject(PLATFORM_ID) private platformId: Object
   ) {
-    // Cargar token y usuario del localStorage al inicializar (solo en el navegador)
+    this.loadUserFromStorage();
+  }
+
+  private loadUserFromStorage(): void {
     if (isPlatformBrowser(this.platformId)) {
-      this.loadStoredAuth();
+      const token = localStorage.getItem('token');
+      const userJson = localStorage.getItem('user');
+      if (token && userJson) {
+        this.currentUserSubject.next(JSON.parse(userJson));
+      }
     }
   }
 
-  private loadStoredAuth(): void {
-    if (!isPlatformBrowser(this.platformId)) {
-      return;
-    }
-    
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
-    
-    if (token && user) {
-      this.tokenSubject.next(token);
-      this.currentUserSubject.next(JSON.parse(user));
-    }
+  // CAMBIO: El método ahora espera y devuelve la interfaz correcta
+  register(userData: UserCreate): Observable<RegisterResponse> {
+    return this.http.post<RegisterResponse>(`${this.apiUrl}/api/users/register`, userData);
   }
 
-  register(userData: UserCreate): Observable<User> {
-    console.log('Register URL:', `${this.apiUrl}/api/users/register`);
-    console.log('Register data:', userData);
-    
-    return this.http.post<User>(`${this.apiUrl}/api/users/register`, userData);
-  }
-
-  login(credentials: UserLogin): Observable<Token> {
-    return this.http.post<Token>(`${this.apiUrl}/api/users/login`, credentials)
+  // CAMBIO: El método ahora usa LoginResponse y guarda el usuario de la respuesta
+  login(credentials: UserLogin): Observable<LoginResponse> {
+    return this.http.post<LoginResponse>(`${this.apiUrl}/api/users/login`, credentials)
       .pipe(
         tap(response => {
-          // Guardar token
-          this.setToken(response.access_token);
-          
-          // Obtener información del usuario
-          this.getCurrentUserInfo().subscribe(user => {
-            this.setUser(user);
-          });
+          this.setAuth(response.access_token, response.user);
         })
       );
   }
@@ -71,28 +56,24 @@ export class AuthService {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
     }
-    this.tokenSubject.next(null);
     this.currentUserSubject.next(null);
     this.router.navigate(['/login']);
   }
 
   getCurrentUserInfo(): Observable<User> {
-    return this.http.get<User>(`${this.apiUrl}/api/users/me`);
-  }
-
-  updateCurrentUser(userData: Partial<User>): Observable<User> {
-    return this.http.put<User>(`${this.apiUrl}/api/users/me`, userData).pipe(
-      tap(updatedUser => {
-        this.setUser(updatedUser);
+    return this.http.get<User>(`${this.apiUrl}/api/users/me`).pipe(
+      tap(user => {
+        this.setUser(user);
       })
     );
   }
 
-  private setToken(token: string): void {
+  private setAuth(token: string, user: User): void {
     if (isPlatformBrowser(this.platformId)) {
       localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
     }
-    this.tokenSubject.next(token);
+    this.currentUserSubject.next(user);
   }
 
   private setUser(user: User): void {
@@ -103,33 +84,10 @@ export class AuthService {
   }
 
   getToken(): string | null {
-    const token = this.tokenSubject.value || 
-           (isPlatformBrowser(this.platformId) ? localStorage.getItem('token') : null);
-    console.log('🔐 AuthService.getToken() - Token disponible:', !!token);
-    if (token) {
-      console.log('🔐 Token (primeros 20 chars):', token.substring(0, 20) + '...');
-      
-      // Verificar si el token ha expirado
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const now = Math.floor(Date.now() / 1000);
-        const isExpired = payload.exp < now;
-        
-        console.log('🔐 Token expira en:', new Date(payload.exp * 1000));
-        console.log('🔐 Token expirado:', isExpired);
-        
-        if (isExpired) {
-          console.warn('⚠️ Token expirado, redirigiendo al login...');
-          this.logout();
-          return null;
-        }
-      } catch (error) {
-        console.error('❌ Error verificando token:', error);
-        this.logout();
-        return null;
-      }
+    if (isPlatformBrowser(this.platformId)) {
+      return localStorage.getItem('token');
     }
-    return token;
+    return null;
   }
 
   getCurrentUser(): User | null {
@@ -137,32 +95,7 @@ export class AuthService {
   }
 
   isAuthenticated(): boolean {
+    // NOTA: Una mejor verificación podría incluir la validación de la expiración del token aquí
     return !!this.getToken();
-  }
-
-  getAuthHeaders(): HttpHeaders {
-    const token = this.getToken();
-    return new HttpHeaders({
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    });
-  }
-
-  // Método para refrescar información del usuario
-  refreshUserInfo(): Observable<User> {
-    return this.getCurrentUserInfo().pipe(
-      tap(user => this.setUser(user))
-    );
-  }
-
-  // Método de prueba de conectividad
-  testConnection(): Observable<any> {
-    console.log('Testing connection to:', `${this.apiUrl}/health`);
-    return this.http.get(`${this.apiUrl}/health`);
-  }
-
-  // Método para obtener la URL de la API (para debugging)
-  getApiUrl(): string {
-    return this.apiUrl;
   }
 }

@@ -1,33 +1,21 @@
-export interface ApiResponse<T = any> {
-  success: boolean;
+// src/app/interfaces/api.interface.ts
+import { User } from './user.interface';
+
+// CAMBIO: Se añade la interfaz para la respuesta del registro
+export interface RegisterResponse {
   message: string;
-  data?: T;
+  access_token: string;
+  user: User;
 }
 
+// CAMBIO: Se ajusta la interfaz del login para que coincida con la respuesta real
+export interface LoginResponse {
+  message: string;
+  access_token: string;
+  user: User;
+}
+
+// Se mantiene Token, pero LoginResponse es más descriptivo
 export interface Token {
   access_token: string;
-  token_type: string;
-}
-
-export interface TokenData {
-  username?: string;
-}
-
-export interface PaginatedResponse<T> {
-  items: T[];
-  total: number;
-  page: number;
-  per_page: number;
-  pages: number;
-}
-
-export interface MessageResponse {
-  success: boolean;
-  message: string;
-  data?: any;
-}
-
-export interface RoomMemberAction {
-  room_id: number;
-  user_id: number;
 }

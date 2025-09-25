@@ -54,10 +54,10 @@ export class RoomsComponent implements OnInit {
 
     console.log('🏠 Cargando salas...');
     console.log('🔐 Usuario autenticado:', this.authService.isAuthenticated());
-    console.log('🌐 API URL:', this.chatService.getApiUrl());
+    console.log('👤 Usuario actual:', this.currentUser);
 
     // Cargar salas públicas
-    this.chatService.getPublicRooms().subscribe({
+    this.chatService.getRooms().subscribe({
       next: (rooms) => {
         console.log('✅ Salas públicas cargadas:', rooms.length);
         console.log('🔍 Datos de salas:', rooms);
@@ -66,7 +66,7 @@ export class RoomsComponent implements OnInit {
         });
         this.publicRooms = rooms;
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('❌ Error cargando salas públicas:', error);
         console.error('❌ Status:', error.status);
         console.error('❌ Message:', error.message);
@@ -77,7 +77,7 @@ export class RoomsComponent implements OnInit {
 
     // Cargar salas del usuario si está autenticado
     if (this.authService.isAuthenticated()) {
-      this.chatService.getUserRooms().subscribe({
+      this.chatService.getRooms().subscribe({
         next: (rooms) => {
           console.log('✅ Salas del usuario cargadas:', rooms.length);
           this.userRooms = rooms;
@@ -100,7 +100,7 @@ export class RoomsComponent implements OnInit {
         console.log('Te uniste a la sala exitosamente');
         this.loadRooms(); // Recargar para actualizar la lista
       },
-      error: (error) => {
+      error: (error : any) => {
         console.error('Error uniéndose a la sala:', error);
         if (error.error?.detail) {
           alert('Error: ' + error.error.detail);

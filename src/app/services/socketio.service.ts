@@ -10,7 +10,7 @@ import { environment } from '../../environments/environment';
 })
 export class SocketIOService {
   private socket: Socket | null = null;
-  private wsUrl = environment.wsUrl || environment.apiUrl;
+  private wsUrl = environment.apiUrl || environment.apiUrl;
   
   // Subjects para diferentes tipos de mensajes
   private messagesSubject = new Subject<any>();
