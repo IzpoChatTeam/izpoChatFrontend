@@ -36,16 +36,17 @@ export class AuthService {
     }
   }
 
-  // CAMBIO: El método ahora espera y devuelve la interfaz correcta
+  // Registro - solo devuelve user (sin token automático)
   register(userData: UserCreate): Observable<RegisterResponse> {
     return this.http.post<RegisterResponse>(`${this.apiUrl}/api/users/register`, userData);
   }
 
-  // CAMBIO: El método ahora usa LoginResponse y guarda el usuario de la respuesta
+  // Login - devuelve token y user
   login(credentials: UserLogin): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(`${this.apiUrl}/api/users/login`, credentials)
       .pipe(
         tap(response => {
+          // Guardar token y usuario de la respuesta
           this.setAuth(response.access_token, response.user);
         })
       );

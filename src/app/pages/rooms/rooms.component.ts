@@ -58,57 +58,35 @@ export class RoomsComponent implements OnInit {
 
     // Cargar salas públicas
     this.chatService.getRooms().subscribe({
-      next: (rooms) => {
-        console.log('✅ Salas públicas cargadas:', rooms.length);
-        console.log('🔍 Datos de salas:', rooms);
-        rooms.forEach((room, index) => {
+      next: (response) => {
+        console.log('✅ Salas cargadas:', response.data.length);
+        console.log('🔍 Datos de salas:', response.data);
+        response.data.forEach((room, index) => {
           console.log(`🏠 Sala ${index + 1}: ID=${room.id}, Nombre="${room.name}"`);
         });
-        this.publicRooms = rooms;
+        
+        // Separar salas públicas y privadas
+        this.publicRooms = response.data.filter(room => !room.is_private);
+        this.userRooms = response.data.filter(room => 
+          room.is_private && room.members?.some(member => member.id === this.currentUser?.id)
+        );
+        this.loading = false;
       },
       error: (error: any) => {
-        console.error('❌ Error cargando salas públicas:', error);
+        console.error('❌ Error cargando salas:', error);
         console.error('❌ Status:', error.status);
         console.error('❌ Message:', error.message);
         console.error('❌ Error detail:', error.error);
-        this.error = `Error al cargar salas públicas: ${error.status} - ${error.message}`;
+        this.error = `Error al cargar salas: ${error.status} - ${error.message}`;
+        this.loading = false;
       }
     });
-
-    // Cargar salas del usuario si está autenticado
-    if (this.authService.isAuthenticated()) {
-      this.chatService.getRooms().subscribe({
-        next: (rooms) => {
-          console.log('✅ Salas del usuario cargadas:', rooms.length);
-          this.userRooms = rooms;
-          this.loading = false;
-        },
-        error: (error) => {
-          console.error('❌ Error cargando salas del usuario:', error);
-          this.error = 'Error al cargar tus salas';
-          this.loading = false;
-        }
-      });
-    } else {
-      this.loading = false;
-    }
   }
 
   joinRoom(roomId: number): void {
-    this.chatService.joinRoom(roomId).subscribe({
-      next: () => {
-        console.log('Te uniste a la sala exitosamente');
-        this.loadRooms(); // Recargar para actualizar la lista
-      },
-      error: (error : any) => {
-        console.error('Error uniéndose a la sala:', error);
-        if (error.error?.detail) {
-          alert('Error: ' + error.error.detail);
-        } else {
-          alert('Error al unirse a la sala');
-        }
-      }
-    });
+    // Navegar directamente a la sala
+    console.log('Navegando a sala con ID:', roomId);
+    this.router.navigate(['/chat', roomId]);
   }
 
   enterRoom(roomId: number): void {
@@ -132,15 +110,15 @@ export class RoomsComponent implements OnInit {
       const roomData: RoomCreate = this.createRoomForm.value;
       
       this.chatService.createRoom(roomData).subscribe({
-        next: (room) => {
-          console.log('Sala creada exitosamente:', room);
+        next: (response) => {
+          console.log('Sala creada exitosamente:', response.data);
           this.toggleCreateForm();
           this.loadRooms();
           this.creatingRoom = false;
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('Error creando sala:', error);
-          alert('Error al crear la sala');
+          this.error = 'Error al crear la sala';
           this.creatingRoom = false;
         }
       });
@@ -154,7 +132,7 @@ export class RoomsComponent implements OnInit {
 
   isUserOwner(room: Room): boolean {
     if (!this.currentUser) return false;
-    return room.owner_id === this.currentUser.id;
+    return room.creator.id === this.currentUser.id;
   }
 
   logout(): void {

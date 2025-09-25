@@ -79,48 +79,33 @@ export class RegisterComponent {
       }
 
       this.authService.register(userCreateData).subscribe({
-        next: (response) => {
-          this.success = true;
-          setTimeout(() => {
-            this.router.navigate(['/login']);
-          }, 2000);
-        },
-        error: (error) => {
-          // Si el status es 201, el registro fue exitoso
-          if (error.status === 201) {
-            this.success = true;
-            setTimeout(() => {
-              this.router.navigate(['/login']);
-            }, 2000);
-            this.loading = false;
-            return;
-          }
-          
-          // Manejo simplificado de errores para usuario final
-          if (error.status === 400 && error.error?.error) {
-          // Leemos el mensaje de la propiedad "error" que envía el backend
-          const errorMessage = error.error.error;
-
-          if (errorMessage.includes('Email ya está en uso')) {
+      next: (response) => {
+        console.log('Registro exitoso:', response);
+        this.success = true;
+        setTimeout(() => {
+          this.router.navigate(['/login']);
+        }, 2000);
+      },
+      error: (err) => {
+        if (err.status === 400 && err.error?.error) {
+          const errorMessage = err.error.error;
+          if (errorMessage.includes('Email')) {
             this.error = 'Este correo electrónico ya está registrado.';
-          } else if (errorMessage.includes('Username ya está en uso')) {
+          } else if (errorMessage.includes('Username')) {
             this.error = 'Este nombre de usuario ya está en uso.';
           } else {
             this.error = 'Los datos proporcionados son inválidos.';
           }
-        } else if (error.status === 0) {
-            this.error = 'No se pudo conectar con el servidor. Intenta más tarde.';
         } else {
-          // Para otros errores (500, etc.)
-          this.error = 'Ocurrió un error inesperado al intentar registrar.';
+          this.error = 'Ocurrió un error inesperado al registrar.';
         }
-          this.loading = false;
-        },
-        complete: () => {
-          this.loading = false;
-        }
-      });
-    } else {
+        this.loading = false;
+      },
+      complete: () => {
+        this.loading = false;
+      }
+    });
+  } else {
       this.markFormGroupTouched();
     }
   }

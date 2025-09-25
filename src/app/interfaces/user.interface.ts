@@ -3,9 +3,7 @@ export interface User {
   username: string;
   email: string;
   full_name?: string;
-  is_active: boolean;
   created_at: string;
-  updated_at?: string;
 }
 
 export interface UserCreate {
@@ -24,5 +22,4 @@ export interface UserUpdate {
   username?: string;
   email?: string;
   full_name?: string;
-  is_active?: boolean;
 }

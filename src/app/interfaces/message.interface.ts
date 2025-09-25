@@ -4,12 +4,10 @@ import { Room } from './room.interface';
 export interface FileUpload {
   id: number;
   filename: string;
-  original_filename: string;
   file_size: number;
   content_type: string;
-  file_url: string;  // Flask usa file_url
+  file_url: string;
   user_id: number;
-  room_id?: number;
   created_at: string;
 }
 
@@ -17,13 +15,15 @@ export interface Message {
   id: number;
   content: string;
   user_id: number;
+  username: string;  // Nuevo: el backend devuelve username directamente
   room_id: number;
-  file_url?: string;  // Flask usa file_url directamente
+  file_url?: string | null;
   created_at: string;
-  user: User;  // Flask usa 'user' en lugar de 'sender'
-  room: Room;
-  sender?: User;  // Alias para user para compatibilidad (opcional)
-  file?: FileUpload;  // Para archivos adjuntos
+  sender?: {         // Información completa del remitente
+    id: number;
+    username: string;
+    full_name: string;
+  };
 }
 
 export interface MessageCreate {
@@ -33,17 +33,23 @@ export interface MessageCreate {
 }
 
 export interface WebSocketMessage {
-  type: string;
+  type?: string;
+  id?: number;
   content?: string;
-  room_id?: number;
   user_id?: number;
   username?: string;
+  room_id?: number;
+  created_at?: string;
+  file_url?: string | null;
+  sender?: {
+    id: number;
+    username: string;
+    full_name: string;
+  };
+  status?: string;
+  message_id?: number;
   timestamp?: string;
-  file?: FileUpload;
-  id?: number;
-  sender?: User;
-  typing?: boolean;
-  users?: number[];
-  count?: number;
-  message?: string;
+  room_name?: string;
+  error?: string;
+  code?: string;
 }

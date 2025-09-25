@@ -2,12 +2,10 @@ import { Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewChecked }
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { Subscription, interval } from 'rxjs';
 
 import { ChatService } from '../../services/chat.service';
 import { AuthService } from '../../services/auth.service';
-import { SocketIOService } from '../../services/socketio.service';
-import { FileUploadService } from '../../services/file-upload.service';
 import { Room } from '../../interfaces/room.interface';
 import { Message } from '../../interfaces/message.interface';
 import { User } from '../../interfaces/user.interface';
@@ -22,32 +20,31 @@ import { User } from '../../interfaces/user.interface';
 export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   @ViewChild('messagesContainer') private messagesContainer!: ElementRef;
 
-  // --- PROPIEDADES CORREGIDAS Y AÑADIDAS ---
+  // Propiedades actualizadas para nueva estructura
   room: Room | null = null;
   messages: Message[] = [];
   currentUser: User | null = null;
   messageForm: FormGroup;
   loading = true;
   error = '';
-  connectionStatus = false;
-  uploadProgress = 0;
-  selectedFile: File | null = null; // CORRECCIÓN: Propiedad añadida
+  selectedFile: File | null = null;
+  lastMessageCount = 0;
+  connectionStatus = true; // Siempre true para el modo HTTP
+  uploadProgress = 0; // Para el progreso de subida de archivos
 
   private subscriptions = new Subscription();
   private roomId: number = 0;
   private shouldScrollToBottom = true;
+  private refreshInterval: any;
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private chatService: ChatService,
     private authService: AuthService,
-    private socketIOService: SocketIOService,
-    private fileUploadService: FileUploadService,
     private fb: FormBuilder
   ) {
     this.messageForm = this.fb.group({
-      // CORRECCIÓN: El nombre del control debe coincidir con el HTML
       content: ['', [Validators.required, Validators.maxLength(1000)]]
     });
   }
@@ -59,7 +56,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       this.roomId = +params['id'];
       if (this.roomId) {
         this.loadInitialData();
-        this.setupWebSocketListeners();
+        this.startMessagePolling();
       }
     });
     this.subscriptions.add(paramsSub);
@@ -67,7 +64,9 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   ngOnDestroy(): void {
     this.subscriptions.unsubscribe();
-    this.socketIOService.disconnect();
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+    }
   }
 
   ngAfterViewChecked(): void {
@@ -82,12 +81,11 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.error = '';
 
     this.chatService.getRoomById(this.roomId).subscribe({
-      next: room => {
-        this.room = room;
+      next: response => {
+        this.room = response.data;
         this.loadMessages();
-        this.socketIOService.connect(this.roomId);
       },
-      error: err => {
+      error: (err: any) => {
         this.error = 'No se pudo cargar la información de la sala.';
         this.loading = false;
       }
@@ -96,47 +94,75 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   private loadMessages(): void {
     this.chatService.getRoomMessages(this.roomId).subscribe({
-      next: (messages) => {
-        this.messages = messages;
+      next: (response) => {
+        this.messages = response.data.sort((a, b) => 
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        this.lastMessageCount = this.messages.length;
         this.loading = false;
         this.shouldScrollToBottom = true;
       },
-      error: (err) => {
+      error: (err: any) => {
         this.error = 'Error al cargar mensajes.';
         this.loading = false;
       }
     });
   }
 
-  private setupWebSocketListeners(): void {
-    const messagesSub = this.socketIOService.messages$.subscribe((newMessage: Message) => {
-      const messageExists = this.messages.some(msg => msg.id === newMessage.id);
-      if (!messageExists) {
-        this.messages.push(newMessage);
-        this.shouldScrollToBottom = true;
+  private startMessagePolling(): void {
+    // Refrescar mensajes cada 3 segundos para simular tiempo real
+    this.refreshInterval = setInterval(() => {
+      this.checkForNewMessages();
+    }, 3000);
+  }
+
+  private checkForNewMessages(): void {
+    this.chatService.getRoomMessages(this.roomId).subscribe({
+      next: (response) => {
+        const newMessages = response.data.sort((a, b) => 
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        
+        if (newMessages.length > this.lastMessageCount) {
+          this.messages = newMessages;
+          this.lastMessageCount = newMessages.length;
+          this.shouldScrollToBottom = true;
+        }
+      },
+      error: () => {
+        // Error silencioso en el polling
       }
     });
-
-    const statusSub = this.socketIOService.connectionStatus$.subscribe(status => {
-      this.connectionStatus = status;
-      if (!status && this.currentUser) { // Solo mostrar error si no es el logout inicial
-        this.error = "Conexión en tiempo real perdida. Intentando reconectar...";
-      } else if (status) {
-        this.error = ""; // Limpiar error al reconectar
-      }
-    });
-
-    this.subscriptions.add(messagesSub);
-    this.subscriptions.add(statusSub);
   }
 
   sendMessage(): void {
-    if (this.messageForm.invalid || !this.connectionStatus) return;
+    if (this.messageForm.invalid) return;
 
     const content = this.messageForm.value.content.trim();
-    if (content) {
-      this.socketIOService.sendMessage(this.roomId, content);
+    if (content && this.room) {
+      // Mostrar el mensaje inmediatamente de forma optimista
+      const optimisticMessage: Message = {
+        id: Date.now(), // ID temporal
+        content: content,
+        username: this.currentUser?.username || 'Usuario',
+        sender: {
+          id: this.currentUser?.id || 0,
+          username: this.currentUser?.username || 'Usuario',
+          full_name: this.currentUser?.full_name || this.currentUser?.username || 'Usuario'
+        },
+        user_id: this.currentUser?.id || 0,
+        room_id: this.roomId,
+        created_at: new Date().toISOString()
+      };
+      
+      this.messages.push(optimisticMessage);
+      this.shouldScrollToBottom = true;
       this.messageForm.reset();
+      
+      // Actualizar mensajes desde el servidor después de un momento
+      setTimeout(() => {
+        this.checkForNewMessages();
+      }, 1000);
     }
   }
 
@@ -153,27 +179,19 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       return;
     }
     
-    // SIMPLIFICADO: La lógica de enviar mensaje se elimina, el backend lo hace.
-    this.uploadProgress = 1;
-    const uploadSub = this.fileUploadService.uploadFile(this.selectedFile, String(this.roomId))
-      .subscribe({
-        next: (progressEvent) => {
-          this.uploadProgress = progressEvent.progress;
-          if (progressEvent.file) {
-            console.log('Subida completa, el backend emitirá el mensaje.', progressEvent.file);
-            this.uploadProgress = 0;
-            this.selectedFile = null;
-          }
-        },
-        error: (err) => {
-          this.error = 'Error al subir el archivo.';
-          this.uploadProgress = 0;
-          this.selectedFile = null;
-        }
-      });
-    this.subscriptions.add(uploadSub);
+    this.chatService.uploadFile(this.selectedFile).subscribe({
+      next: (response) => {
+        console.log('Archivo subido:', response.data);
+        // Aquí podrías enviar un mensaje con el archivo
+        this.selectedFile = null;
+      },
+      error: (err: any) => {
+        this.error = 'Error al subir el archivo.';
+        this.selectedFile = null;
+      }
+    });
     
-    // Resetear el input para permitir subir el mismo archivo de nuevo
+    // Resetear el input
     const fileInput = document.getElementById('fileInput') as HTMLInputElement;
     if (fileInput) fileInput.value = '';
   }
@@ -215,16 +233,15 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   isOwnMessage(message: Message): boolean {
-    // CORRECCIÓN: Lógica más robusta para mensajes iniciales y de WebSocket
+    // Comprobar tanto sender.id como user_id para compatibilidad
     return message.sender?.id === this.currentUser?.id || message.user_id === this.currentUser?.id;
   }
 
-// Add this method inside your ChatComponent class
-onKeyPress(event: KeyboardEvent): void {
-  if (event.key === 'Enter' && !event.shiftKey) {
-    event.preventDefault();
-    this.sendMessage();
+  onKeyPress(event: KeyboardEvent): void {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      this.sendMessage();
+    }
   }
-}
 }
 
